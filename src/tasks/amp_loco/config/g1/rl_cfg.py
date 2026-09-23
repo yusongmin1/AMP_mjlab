@@ -17,6 +17,37 @@ _MOTION_DATA_DIR = os.path.join(
   "src", "assets", "motions", "g1", "amp",
 )
 
+# String path resolved by rsl_rl ``string_to_callable`` (module:attr).
+_G1_SYMMETRY_FUNC = "src.tasks.amp_loco.mdp.symmetry.g1:compute_symmetric_states"
+
+
+@dataclass
+class RslRlSymmetryCfg:
+  """Optional left-right symmetry augmentation / mirror loss (default: off).
+
+  Enable via CLI, e.g.::
+
+    --agent.algorithm.symmetry-cfg.use-data-augmentation
+    --agent.algorithm.symmetry-cfg.use-mirror-loss
+    --agent.algorithm.symmetry-cfg.mirror-loss-coeff 0.2
+  """
+
+  use_data_augmentation: bool = False
+  """If True, doubles each mini-batch with left-right mirrored transitions."""
+  use_mirror_loss: bool = False
+  """If True, adds an MSE mirror-consistency term on the actor mean."""
+  data_augmentation_func: str = _G1_SYMMETRY_FUNC
+  """``module:function`` implementing ``compute_symmetric_states``."""
+  mirror_loss_coeff: float = 0.2
+  """Coefficient for the mirror loss when ``use_mirror_loss`` is True."""
+
+
+@dataclass
+class RslRlAmpPpoAlgorithmCfg(RslRlPpoAlgorithmCfg):
+  """PPO algorithm config with optional symmetry (disabled by default)."""
+
+  symmetry_cfg: RslRlSymmetryCfg | None = field(default_factory=RslRlSymmetryCfg)
+
 
 @dataclass
 class RslRlAmpRunnerCfg(RslRlOnPolicyRunnerCfg):
@@ -47,7 +78,7 @@ def g1_amp_ppo_runner_cfg() -> RslRlAmpRunnerCfg:
       activation="elu",
       obs_normalization=True,
     ),
-    algorithm=RslRlPpoAlgorithmCfg(
+    algorithm=RslRlAmpPpoAlgorithmCfg(
       value_loss_coef=1.0,
       use_clipped_value_loss=True,
       clip_param=0.2,
@@ -61,6 +92,8 @@ def g1_amp_ppo_runner_cfg() -> RslRlAmpRunnerCfg:
       desired_kl=0.01,
       max_grad_norm=1.0,
       class_name="AMPPPO",
+      # Symmetry off by default; flip flags to enable (see RslRlSymmetryCfg).
+      symmetry_cfg=RslRlSymmetryCfg(),
     ),
     experiment_name="g1_amp_locomotion",
     logger="tensorboard",

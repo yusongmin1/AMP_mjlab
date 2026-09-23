@@ -155,10 +155,13 @@ class OnPolicyRunner:
             # scale down the rnd weight with timestep (similar to how rewards are scaled down in legged_gym envs)
             self.alg_cfg["rnd_cfg"]["weight"] *= env.unwrapped.step_dt
 
-        # if using symmetry then pass the environment config object
+        # if using symmetry then pass the environment (needed by data_augmentation_func)
         if "symmetry_cfg" in self.alg_cfg and self.alg_cfg["symmetry_cfg"] is not None:
-            # this is used by the symmetry function for handling different observation terms
-            self.alg_cfg["symmetry_cfg"]["_env"] = env
+            sc = self.alg_cfg["symmetry_cfg"]
+            if not (sc.get("use_data_augmentation") or sc.get("use_mirror_loss")):
+                self.alg_cfg["symmetry_cfg"] = None
+            else:
+                self.alg_cfg["symmetry_cfg"] = {**sc, "_env": env}
 
         # initialize algorithm
         alg_class = eval(self.alg_cfg.pop("class_name"))

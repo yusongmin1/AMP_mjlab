@@ -152,10 +152,15 @@ class AmpOnPolicyRunner:
             # scale down the rnd weight with timestep (similar to how rewards are scaled down in legged_gym envs)
             self.alg_cfg["rnd_cfg"]["weight"] *= env.unwrapped.step_dt
 
-        # if using symmetry then pass the environment config object
+        # if using symmetry then pass the environment (needed by data_augmentation_func)
         if "symmetry_cfg" in self.alg_cfg and self.alg_cfg["symmetry_cfg"] is not None:
-            # this is used by the symmetry function for handling different observation terms
-            self.alg_cfg["symmetry_cfg"]["_env"] = env
+            sc = self.alg_cfg["symmetry_cfg"]
+            # Default / disabled: both flags False -> do not wire symmetry at all.
+            if not (sc.get("use_data_augmentation") or sc.get("use_mirror_loss")):
+                self.alg_cfg["symmetry_cfg"] = None
+            else:
+                # Copy so agent.yaml dump stays serializable (no live env object).
+                self.alg_cfg["symmetry_cfg"] = {**sc, "_env": env}
 
         # init amp loader (joint_pos + joint_vel only, matching env amp_state)
         amp_data = AMPLoader(
@@ -209,6 +214,10 @@ class AmpOnPolicyRunner:
             **self.alg_cfg,
             multi_gpu_cfg=self.multi_gpu_cfg,
         )
+        # Drop live env ref from train cfg so agent.yaml dump stays serializable.
+        sc = self.alg_cfg.get("symmetry_cfg")
+        if isinstance(sc, dict) and "_env" in sc:
+            self.alg_cfg["symmetry_cfg"] = {k: v for k, v in sc.items() if k != "_env"}
 
         # store training configuration
         self.num_steps_per_env = self.cfg["num_steps_per_env"]
