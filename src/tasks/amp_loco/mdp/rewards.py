@@ -246,3 +246,55 @@ def self_collision_cost(
   return data.found.squeeze(-1)
 
 
+def feet_too_near(
+  env: ManagerBasedRlEnv,
+  asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+  threshold: float = 0.2,
+  mask_delay: bool = False,
+  delay_env_rew_ratio: float = 1.0,
+) -> torch.Tensor:
+  """Penalize feet closer than `threshold` (ported from legged_lab feet_too_near_humanoid).
+
+  asset_cfg must resolve to exactly two bodies (the two ankle_roll links);
+  returns (threshold - distance).clamp(min=0), so cost > 0 only when the
+  feet are closer than the threshold.
+  """
+  asset: Entity = env.scene[asset_cfg.name]
+  body_ids = asset_cfg.body_ids
+  if isinstance(body_ids, slice):
+    raise ValueError(
+      "feet_too_near: body_names must select exactly two bodies "
+      "(e.g. ('.*ankle_roll.*', ))"
+    )
+  if len(body_ids) != 2:
+    raise ValueError(
+      f"feet_too_near: expected exactly 2 bodies, got {len(body_ids)}"
+    )
+  feet_pos = asset.data.body_link_pos_w[:, body_ids, :]  # [B, 2, 3]
+  distance = torch.norm(feet_pos[:, 0] - feet_pos[:, 1], dim=-1)  # [B]
+  reward = (threshold - distance).clamp(min=0)
+  return _apply_delay_env_reward_scaling(env, reward, mask_delay, delay_env_rew_ratio)
+
+
+def joint_deviation_l1(
+  env: ManagerBasedRlEnv,
+  asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+  mask_delay: bool = False,
+  delay_env_rew_ratio: float = 1.0,
+) -> torch.Tensor:
+  """L1 penalty on deviation of selected joints from default (legged_lab port).
+
+  Use joint_names to select e.g. hip_yaw / hip_roll / shoulder_pitch / elbow
+  joints, discouraging flailing arms and splayed legs.
+  """
+  asset: Entity = env.scene[asset_cfg.name]
+  default_joint_pos = asset.data.default_joint_pos
+  assert default_joint_pos is not None
+  angle = (
+    asset.data.joint_pos[:, asset_cfg.joint_ids]
+    - default_joint_pos[:, asset_cfg.joint_ids]
+  )
+  reward = torch.sum(torch.abs(angle), dim=1)
+  return _apply_delay_env_reward_scaling(env, reward, mask_delay, delay_env_rew_ratio)
+
+

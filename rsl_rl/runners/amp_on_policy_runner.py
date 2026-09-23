@@ -30,11 +30,8 @@ from rsl_rl.algorithms import AMPPPO
 from rsl_rl.env import VecEnv
 from rsl_rl.modules import (
     ActorCritic,
-    ActorCriticRecurrent,
     Discriminator,
     EmpiricalNormalization,
-    StudentTeacher,
-    StudentTeacherRecurrent,
 )
 from rsl_rl.utils import AMPLoader, Normalizer, store_code_state
 
@@ -532,6 +529,11 @@ class AmpOnPolicyRunner:
         print(log_string)
 
     def save(self, path: str, infos=None):
+        # Persist env curricula clock (velocity stages, recovery force, etc.).
+        env_state = {
+            "common_step_counter": int(self.env.unwrapped.common_step_counter),
+        }
+        infos = {**(infos or {}), "env_state": env_state}
         # -- Save model
         saved_dict = {
             "model_state_dict": self.alg.policy.state_dict(),
@@ -612,6 +614,23 @@ class AmpOnPolicyRunner:
         # -- load current learning iteration
         if resumed_training:
             self.current_learning_iteration = loaded_dict["iter"]
+            # Restore env curricula clock. Old checkpoints may lack env_state;
+            # fall back to iter * steps_per_env so velocity/force curricula
+            # resume at the correct stage instead of resetting to stage 0.
+            infos = loaded_dict.get("infos") or {}
+            env_state = infos.get("env_state") if isinstance(infos, dict) else None
+            if isinstance(env_state, dict) and "common_step_counter" in env_state:
+                step = int(env_state["common_step_counter"])
+            else:
+                step = int(self.current_learning_iteration) * int(self.num_steps_per_env)
+                print(
+                    f"[WARN] Checkpoint has no env_state; "
+                    f"setting common_step_counter={step} "
+                    f"(iter={self.current_learning_iteration} × "
+                    f"steps_per_env={self.num_steps_per_env})"
+                )
+            self.env.unwrapped.common_step_counter = step
+            print(f"[INFO] Restored common_step_counter={step}")
         return loaded_dict["infos"]
 
     def get_inference_policy(self, device=None):

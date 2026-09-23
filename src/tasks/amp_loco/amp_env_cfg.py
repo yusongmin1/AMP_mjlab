@@ -283,6 +283,27 @@ def make_amp_env_cfg() -> ManagerBasedRlEnvCfg:
     "joint_acc_l2": RewardTermCfg(func=mdp.joint_acc_l2, weight=-2.5e-7),
     "joint_pos_limits": RewardTermCfg(func=mdp.joint_pos_limits, weight=-10.0),
     "action_rate_l2": RewardTermCfg(func=mdp.action_rate_l2, weight=-0.01),
+    "feet_too_near": RewardTermCfg(
+      func=mdp.feet_too_near,
+      weight=-2.0,
+      params={
+        "asset_cfg": SceneEntityCfg("robot", body_names=()),  # Set per-robot.
+        "threshold": 0.2,
+        "mask_delay": True,
+        "delay_env_rew_ratio": 0.0,
+      },
+    ),
+    "joint_deviation_hip": RewardTermCfg(
+      func=mdp.joint_deviation_l1,
+      weight=-0.15,
+      params={
+        "asset_cfg": SceneEntityCfg(
+          "robot", joint_names=()
+        ),  # Set per-robot.
+        "mask_delay": True,
+        "delay_env_rew_ratio": 0.0,
+      },
+    ),
     
     "foot_slip": RewardTermCfg(
       func=mdp.feet_slip,

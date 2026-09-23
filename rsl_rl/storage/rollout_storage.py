@@ -38,7 +38,6 @@ class RolloutStorage:
             self.action_sigma = None
             self.hidden_states = None
             self.rnd_state = None
-            # self.gt = None
         def clear(self):
             self.__init__()
 

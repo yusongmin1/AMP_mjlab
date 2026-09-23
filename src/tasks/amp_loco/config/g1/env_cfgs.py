@@ -124,6 +124,13 @@ def g1_amp_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     params={"sensor_name": self_collision_cfg.name, "force_threshold": 10.0},
   )
   cfg.rewards["body_ang_vel_xy_l2"].params["body_cfg"].body_names = (root_name,)
+  cfg.rewards["feet_too_near"].params["asset_cfg"].body_names = (".*ankle_roll.*",)
+  cfg.rewards["joint_deviation_hip"].params["asset_cfg"].joint_names = (
+    ".*_hip_yaw.*",
+    ".*_hip_roll.*",
+    # ".*_shoulder_pitch.*",
+    # ".*_elbow.*",
+  )
 
   cfg.observations["critic"].terms["frame"].params["anchor_cfg"].body_names = (anchor_name,)
   cfg.observations["critic"].terms["frame"].params["body_cfg"].body_names = body_names

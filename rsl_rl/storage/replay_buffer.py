@@ -43,18 +43,10 @@ class ReplayBuffer:
         start_idx = self.step
         end_idx = self.step + num_states
         if end_idx > self.buffer_size:
-            self.states[self.step : self.buffer_size] = states[
-                : self.buffer_size - self.step
-            ]
-            self.next_states[self.step : self.buffer_size] = next_states[
-                : self.buffer_size - self.step
-            ]
-            self.states[: end_idx - self.buffer_size] = states[
-                self.buffer_size - self.step :
-            ]
-            self.next_states[: end_idx - self.buffer_size] = next_states[
-                self.buffer_size - self.step :
-            ]
+            self.states[self.step : self.buffer_size] = states[: self.buffer_size - self.step]
+            self.next_states[self.step : self.buffer_size] = next_states[: self.buffer_size - self.step]
+            self.states[: end_idx - self.buffer_size] = states[self.buffer_size - self.step :]
+            self.next_states[: end_idx - self.buffer_size] = next_states[self.buffer_size - self.step :]
         else:
             self.states[start_idx:end_idx] = states
             self.next_states[start_idx:end_idx] = next_states
@@ -65,7 +57,4 @@ class ReplayBuffer:
     def feed_forward_generator(self, num_mini_batch, mini_batch_size):
         for _ in range(num_mini_batch):
             sample_idxs = np.random.choice(self.num_samples, size=mini_batch_size)
-            yield (
-                self.states[sample_idxs].to(self.device),
-                self.next_states[sample_idxs].to(self.device),
-            )
+            yield (self.states[sample_idxs].to(self.device), self.next_states[sample_idxs].to(self.device))
