@@ -151,6 +151,25 @@ def body_ang_vel_xy_l2(
   reward = torch.exp(-ang_vel_xy_error / std**2)
   return _apply_delay_env_reward_scaling(env, reward, mask_delay, delay_env_rew_ratio)
 
+
+def body_orientation_l2(
+  env: ManagerBasedRlEnv,
+  asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+) -> torch.Tensor:
+  """Penalize non-upright orientation of a selected body (e.g. torso).
+
+  Uses projected gravity xy in that body's frame; falls back to root if no
+  body_ids are set.
+  """
+  asset: Entity = env.scene[asset_cfg.name]
+  if asset_cfg.body_ids:
+    body_quat_w = asset.data.body_link_quat_w[:, asset_cfg.body_ids, :]
+    body_quat_w = body_quat_w.squeeze(1)
+    projected_gravity_b = quat_apply_inverse(body_quat_w, asset.data.gravity_vec_w)
+    return torch.sum(torch.square(projected_gravity_b[:, :2]), dim=1)
+  return torch.sum(torch.square(asset.data.projected_gravity_b[:, :2]), dim=1)
+
+
 def track_root_height(
   env: ManagerBasedRlEnv,
   std: float,
@@ -249,15 +268,14 @@ def self_collision_cost(
 def feet_too_near(
   env: ManagerBasedRlEnv,
   asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
-  threshold: float = 0.2,
+  threshold: float = 0.15,
   mask_delay: bool = False,
   delay_env_rew_ratio: float = 1.0,
 ) -> torch.Tensor:
-  """Penalize feet closer than `threshold` (ported from legged_lab feet_too_near_humanoid).
+  """Penalize feet whose base-frame lateral (y) separation is below `threshold`.
 
-  asset_cfg must resolve to exactly two bodies (the two ankle_roll links);
-  returns (threshold - distance).clamp(min=0), so cost > 0 only when the
-  feet are closer than the threshold.
+  Ignores x/z; only ``|y_left - y_right|`` in the root/base frame is used.
+  asset_cfg must resolve to exactly two bodies (the two ankle_roll links).
   """
   asset: Entity = env.scene[asset_cfg.name]
   body_ids = asset_cfg.body_ids
@@ -270,9 +288,15 @@ def feet_too_near(
     raise ValueError(
       f"feet_too_near: expected exactly 2 bodies, got {len(body_ids)}"
     )
-  feet_pos = asset.data.body_link_pos_w[:, body_ids, :]  # [B, 2, 3]
-  distance = torch.norm(feet_pos[:, 0] - feet_pos[:, 1], dim=-1)  # [B]
-  reward = (threshold - distance).clamp(min=0)
+  feet_pos_w = asset.data.body_link_pos_w[:, body_ids, :]  # [B, 2, 3]
+  root_pos_w = asset.data.root_link_pos_w  # [B, 3]
+  root_quat_w = asset.data.root_link_quat_w  # [B, 4]
+  feet_pos_b = quat_apply_inverse(
+    root_quat_w[:, None, :].expand(-1, 2, -1).reshape(-1, 4),
+    (feet_pos_w - root_pos_w[:, None, :]).reshape(-1, 3),
+  ).reshape(-1, 2, 3)
+  distance_y = torch.abs(feet_pos_b[:, 0, 1] - feet_pos_b[:, 1, 1])
+  reward = (threshold - distance_y).clamp(min=0)
   return _apply_delay_env_reward_scaling(env, reward, mask_delay, delay_env_rew_ratio)
 
 

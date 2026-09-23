@@ -277,6 +277,16 @@ def make_amp_env_cfg() -> ManagerBasedRlEnvCfg:
                 "delay_env_rew_ratio": 0.0,
                 "body_cfg": SceneEntityCfg("robot", body_names=("pelvis",)),},
     ),
+    "body_orientation_l2": RewardTermCfg(
+      func=mdp.body_orientation_l2,
+      weight=-2.0,
+      params={"asset_cfg": SceneEntityCfg("robot", body_names=())},  # Set per-robot (torso).
+    ),
+    "flat_orientation_l2": RewardTermCfg(
+      func=mdp.flat_orientation_l2,
+      weight=-1.0,
+      params={"asset_cfg": SceneEntityCfg("robot")},
+    ),
     
     "is_terminated": RewardTermCfg(func=mdp.is_terminated, weight=-200.0),
     "joint_acc_l2": RewardTermCfg(func=mdp.joint_acc_l2, weight=-2.5e-7),
@@ -287,7 +297,7 @@ def make_amp_env_cfg() -> ManagerBasedRlEnvCfg:
       weight=-2.0,
       params={
         "asset_cfg": SceneEntityCfg("robot", body_names=()),  # Set per-robot.
-        "threshold": 0.2,
+        "threshold": 0.15,
         "mask_delay": True,
         "delay_env_rew_ratio": 0.0,
       },
