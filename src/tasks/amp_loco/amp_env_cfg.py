@@ -8,7 +8,6 @@ import math
 from dataclasses import replace
 
 from mjlab.envs import ManagerBasedRlEnvCfg
-from mjlab.envs import mdp as envs_mdp
 from mjlab.envs.mdp import dr
 from mjlab.envs.mdp.actions import JointPositionActionCfg
 from mjlab.managers.action_manager import ActionTermCfg
@@ -27,12 +26,12 @@ from mjlab.tasks.velocity import mdp
 from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
 from mjlab.terrains import TerrainEntityCfg
 from mjlab.terrains.config import ROUGH_TERRAINS_CFG
-from mjlab.utils.noise import UniformNoiseCfg as Unoise
 from mjlab.viewer import ViewerConfig
 
 import src.tasks.amp_loco.mdp as mdp
 from src.tasks.amp_loco.mdp.terrain import RANDOM_ROUGH_TERRAINS_CFG
 from src.tasks.velocity.mdp.curriculums import terrain_levels_vel, commands_vel
+from src.tasks.amp_loco.mdp.curriculums import recovery_assist_force
 
 def make_amp_env_cfg() -> ManagerBasedRlEnvCfg:
   """Create AMP Locomotion task configuration."""
@@ -55,113 +54,56 @@ def make_amp_env_cfg() -> ManagerBasedRlEnvCfg:
   ##
   # Observations
   ##
+  # Each group is a single packed "frame"/"state" term so stock mjlab history
+  # flattening is already frame-major (no history_ordering patch required).
 
-  actor_terms = {
-    "base_ang_vel": ObservationTermCfg(
-      func=mdp.builtin_sensor,
-      params={"sensor_name": "robot/imu_ang_vel"},
-      noise=Unoise(n_min=-0.2, n_max=0.2),
-    ),
-    "projected_gravity": ObservationTermCfg(
-      func=mdp.projected_gravity,
-      noise=Unoise(n_min=-0.05, n_max=0.05),
-    ),
-    "command": ObservationTermCfg(
-      func=mdp.generated_commands,
-      params={"command_name": "twist"},
-    ),
-    "joint_pos": ObservationTermCfg(
-      func=mdp.joint_pos_rel,
-      noise=Unoise(n_min=-0.01, n_max=0.01),
-    ),
-    "joint_vel": ObservationTermCfg(
-      func=mdp.joint_vel_rel,
-      noise=Unoise(n_min=-0.5, n_max=0.5),
-    ),
-    "actions": ObservationTermCfg(func=mdp.last_action),
-    "height_scan": ObservationTermCfg(
-      func=envs_mdp.height_scan,
-      params={"sensor_name": "terrain_scan"},
-      noise=Unoise(n_min=-0.1, n_max=0.1),
-      scale=1 / terrain_scan.max_distance,
-    ),
-  }
-
-  critic_terms = {
-    **actor_terms,
-    "base_lin_vel": ObservationTermCfg(
-      func=mdp.builtin_sensor,
-      params={"sensor_name": "robot/imu_lin_vel"},
-    ),
-    "height_scan": ObservationTermCfg(
-      func=envs_mdp.height_scan,
-      params={"sensor_name": "terrain_scan"},
-      scale=1 / terrain_scan.max_distance,
-    ),
-    "body_pos_b": ObservationTermCfg(
-    func=mdp.robot_body_pos_b,
-        params={
-            "anchor_cfg": SceneEntityCfg("robot", body_names=()),
-            "body_cfg": SceneEntityCfg("robot", body_names=()),
-        },
-    ),
-    "body_ori_b": ObservationTermCfg(
-        func=mdp.robot_body_ori_b,
-        params={
-            "anchor_cfg": SceneEntityCfg("robot", body_names=()),
-            "body_cfg": SceneEntityCfg("robot", body_names=()),
-        },
-    ),
-  }
-
-  amp_terms = {
-    "body_pos_b": ObservationTermCfg(
-    func=mdp.robot_body_pos_b,
-        params={
-            "anchor_cfg": SceneEntityCfg("robot", body_names=()),
-            "body_cfg": SceneEntityCfg("robot", body_names=()),
-        },
-    ),
-    "body_ori_b": ObservationTermCfg(
-        func=mdp.robot_body_ori_b,
-        params={
-            "anchor_cfg": SceneEntityCfg("robot", body_names=()),
-            "body_cfg": SceneEntityCfg("robot", body_names=()),
-        },
-    ),
-    "body_lin_vel_b": ObservationTermCfg(
-        func=mdp.robot_body_lin_vel_b,
-        params={
-            "anchor_cfg": SceneEntityCfg("robot", body_names=()),
-            "body_cfg": SceneEntityCfg("robot", body_names=()),
-        },
-    ),
-    "body_ang_vel_b": ObservationTermCfg(
-        func=mdp.robot_body_ang_vel_b,
-        params={
-            "anchor_cfg": SceneEntityCfg("robot", body_names=()),
-            "body_cfg": SceneEntityCfg("robot", body_names=()),
-        },
-    ),
-  }
+  _height_scan_scale = 1.0 / terrain_scan.max_distance
 
   observations = {
     "actor": ObservationGroupCfg(
-      terms=actor_terms,
+      terms={
+        "frame": ObservationTermCfg(
+          func=mdp.actor_frame,
+          params={
+            "command_name": "twist",
+            "include_height_scan": True,
+            "height_scan_sensor_name": "terrain_scan",
+            "height_scan_scale": _height_scan_scale,
+          },
+        ),
+      },
       concatenate_terms=True,
       enable_corruption=True,
       history_length=4,
-      history_ordering="time",
     ),
     "critic": ObservationGroupCfg(
-      terms=critic_terms,
+      terms={
+        "frame": ObservationTermCfg(
+          func=mdp.critic_frame,
+          params={
+            "command_name": "twist",
+            "include_height_scan": True,
+            "height_scan_sensor_name": "terrain_scan",
+            "height_scan_scale": _height_scan_scale,
+            "anchor_cfg": SceneEntityCfg("robot", body_names=()),
+            "body_cfg": SceneEntityCfg("robot", body_names=()),
+          },
+        ),
+      },
       concatenate_terms=True,
       enable_corruption=False,
       history_length=4,
-      history_ordering="time",
     ),
     "amp": ObservationGroupCfg(
-      terms=amp_terms,
+      terms={
+        "state": ObservationTermCfg(
+          func=mdp.amp_state,
+          params={
+            "anchor_cfg": SceneEntityCfg("robot", body_names=()),
+            "body_cfg": SceneEntityCfg("robot", body_names=()),
+          },
+        ),
+      },
       concatenate_terms=True,
       enable_corruption=False,
       history_length=1,
@@ -236,6 +178,7 @@ def make_amp_env_cfg() -> ManagerBasedRlEnvCfg:
       mode="reset",
       params={
         "motion_dir": "",  # Set per-robot (must match init_motion_loader).
+        "recovery_dir": None,  # Set per-robot (must match init_motion_loader).
         "asset_cfg": SceneEntityCfg("robot", joint_names=(".*",)),
       },
     ),
@@ -283,6 +226,17 @@ def make_amp_env_cfg() -> ManagerBasedRlEnvCfg:
           1: (-0.025, 0.025),
           2: (-0.03, 0.03),
         },
+      },
+    ),
+    "recovery_assist_force": EventTermCfg(
+      func=mdp.apply_recovery_assist_force,
+      mode="step",
+      params={
+        "asset_cfg": SceneEntityCfg("robot", body_names=()),  # Set per-robot.
+        "trigger_delay_steps": 125,
+        "apply_prob": 0.8,
+        "initial_force": 300.0,
+        "duration_steps": 50,
       },
     ),
   }
@@ -388,7 +342,18 @@ def make_amp_env_cfg() -> ManagerBasedRlEnvCfg:
         "velocity_stages": [
           {"step": 0, "lin_vel_x": (-0.5, 1.0), "lin_vel_y": (-0.5, 0.5), "ang_vel_z": (-1.0, 1.0)},
           {"step": 5000 * 24, "lin_vel_x": (-1.0, 2.0), "lin_vel_y": (-1.0, 1.0)},
+          {"step": 10000 * 24, "lin_vel_x": (-1.5, 3.0), "lin_vel_y": (-1.0, 1.0), "ang_vel_z": (-3.14 / 2, 3.14 / 2)},
         ],
+      },
+    ),
+    "recovery_assist_force": CurriculumTermCfg(
+      func=recovery_assist_force,
+      params={
+        "event_name": "recovery_assist_force",
+        "initial_force": 250.0,
+        "force_decay": 20.0,
+        "decay_interval_iters": 500,
+        "steps_per_iter": 24,
       },
     ),
   }

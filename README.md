@@ -46,25 +46,13 @@ cd AMP_mjlab
 python -m pip install -e .
 ```
 
-### 2. Apply mjlab Patch (Optional)
+### 2. mjlab Observation Patch (no longer needed)
 
-If you do not apply this patch, remove `history_ordering` configuration from the code.
+Observations now use the same single-frame-term design as DroidUpE1
+(`actor_frame` / `critic_frame` / `amp_state`). Stock mjlab history flattening
+is already frame-major, so the `history_ordering` patch is **not required**.
 
-What this patch does:
-
-- It adds an option for how observation history is flattened: by time (`time`) or by term (`term`).
-- Default mjlab behavior supports only `term` ordering.
-
-Patch file:
-
-- `mjlab_patch/mjlab/managers/observation_manager.py`
-
-Example command:
-
-```bash
-cp mjlab_patch/mjlab/managers/observation_manager.py \
-  /home/crp/miniconda3/envs/mjlab/lib/python3.11/site-packages/mjlab/managers/observation_manager.py
-```
+The `mjlab_patch/` directory is kept for reference only.
 
 ### 3. List Available Tasks
 
@@ -99,8 +87,7 @@ Logs are saved by default to:
 Replay with a trained checkpoint:
 
 ```bash
-python scripts/play.py Unitree-G1-AMP-Rough \
-  --checkpoint-file logs/rsl_rl/g1_amp_locomotion/<run_dir>/model_<iter>.pt
+python scripts/play.py Unitree-G1-AMP-Flat 
 ```
 
 Note: ONNX export is enabled by default in both training and play workflows.

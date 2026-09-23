@@ -5,19 +5,131 @@ from typing import TYPE_CHECKING
 import torch
 
 from mjlab.entity import Entity
+from mjlab.envs.mdp.observations import (
+  builtin_sensor,
+  generated_commands,
+  height_scan,
+  joint_pos_rel,
+  joint_vel_rel,
+  last_action,
+  projected_gravity,
+)
 from mjlab.managers.scene_entity_config import SceneEntityCfg
-from mjlab.sensor import ContactSensor
-
 from mjlab.utils.lab_api.math import (
   matrix_from_quat,
-  subtract_frame_transforms,
   quat_apply_inverse,
+  subtract_frame_transforms,
 )
 
 if TYPE_CHECKING:
   from mjlab.envs import ManagerBasedRlEnv
 
 _DEFAULT_ASSET_CFG = SceneEntityCfg("robot")
+
+
+def _uniform_noise(x: torch.Tensor, n_min: float, n_max: float) -> torch.Tensor:
+  return x + torch.rand_like(x) * (n_max - n_min) + n_min
+
+
+def _actor_frame(
+  env: ManagerBasedRlEnv,
+  command_name: str,
+  include_height_scan: bool,
+  height_scan_sensor_name: str,
+  height_scan_scale: float,
+  corrupt: bool,
+) -> torch.Tensor:
+  """Pack one actor observation frame.
+
+  Keeping the whole frame in one term preserves frame-major history order under
+  stock mjlab (no ``history_ordering`` patch needed).
+  """
+  ang_vel = builtin_sensor(env, "robot/imu_ang_vel")
+  gravity = projected_gravity(env)
+  command = generated_commands(env, command_name)
+  joint_pos = joint_pos_rel(env)
+  joint_vel = joint_vel_rel(env)
+  actions = last_action(env)
+
+  if corrupt:
+    ang_vel = _uniform_noise(ang_vel, -0.2, 0.2)
+    gravity = _uniform_noise(gravity, -0.05, 0.05)
+    joint_pos = _uniform_noise(joint_pos, -0.01, 0.01)
+    joint_vel = _uniform_noise(joint_vel, -0.5, 0.5)
+
+  parts = [ang_vel, gravity, command, joint_pos, joint_vel, actions]
+
+  if include_height_scan:
+    heights = height_scan(env, height_scan_sensor_name)
+    if corrupt:
+      heights = _uniform_noise(heights, -0.1, 0.1)
+    parts.append(heights * height_scan_scale)
+
+  return torch.cat(parts, dim=-1)
+
+
+def actor_frame(
+  env: ManagerBasedRlEnv,
+  command_name: str = "twist",
+  include_height_scan: bool = True,
+  height_scan_sensor_name: str = "terrain_scan",
+  height_scan_scale: float = 0.2,
+) -> torch.Tensor:
+  corrupt = env.cfg.observations["actor"].enable_corruption
+  return _actor_frame(
+    env,
+    command_name=command_name,
+    include_height_scan=include_height_scan,
+    height_scan_sensor_name=height_scan_sensor_name,
+    height_scan_scale=height_scan_scale,
+    corrupt=corrupt,
+  )
+
+
+def critic_frame(
+  env: ManagerBasedRlEnv,
+  anchor_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=()),
+  body_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=()),
+  command_name: str = "twist",
+  include_height_scan: bool = True,
+  height_scan_sensor_name: str = "terrain_scan",
+  height_scan_scale: float = 0.2,
+) -> torch.Tensor:
+  actor = _actor_frame(
+    env,
+    command_name=command_name,
+    include_height_scan=include_height_scan,
+    height_scan_sensor_name=height_scan_sensor_name,
+    height_scan_scale=height_scan_scale,
+    corrupt=False,
+  )
+  lin_vel = builtin_sensor(env, "robot/imu_lin_vel")
+  return torch.cat(
+    (
+      actor,
+      lin_vel,
+      robot_body_pos_b(env, anchor_cfg=anchor_cfg, body_cfg=body_cfg),
+      robot_body_ori_b(env, anchor_cfg=anchor_cfg, body_cfg=body_cfg),
+    ),
+    dim=-1,
+  )
+
+
+def amp_state(
+  env: ManagerBasedRlEnv,
+  anchor_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=()),
+  body_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=()),
+) -> torch.Tensor:
+  """Discriminator observation packed as a single term."""
+  return torch.cat(
+    (
+      robot_body_pos_b(env, anchor_cfg=anchor_cfg, body_cfg=body_cfg),
+      robot_body_ori_b(env, anchor_cfg=anchor_cfg, body_cfg=body_cfg),
+      robot_body_lin_vel_b(env, anchor_cfg=anchor_cfg, body_cfg=body_cfg),
+      robot_body_ang_vel_b(env, anchor_cfg=anchor_cfg, body_cfg=body_cfg),
+    ),
+    dim=-1,
+  )
 
 def robot_body_pos_b(
     env: ManagerBasedRlEnv,

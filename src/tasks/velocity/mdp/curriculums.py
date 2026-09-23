@@ -83,12 +83,12 @@ def commands_vel(
       if "ang_vel_z" in stage and stage["ang_vel_z"] is not None:
         cfg.ranges.ang_vel_z = stage["ang_vel_z"]
   return {
-    # "lin_vel_x_min": torch.tensor(cfg.ranges.lin_vel_x[0]),
-    # "lin_vel_x_max": torch.tensor(cfg.ranges.lin_vel_x[1]),
-    # "lin_vel_y_min": torch.tensor(cfg.ranges.lin_vel_y[0]),
-    # "lin_vel_y_max": torch.tensor(cfg.ranges.lin_vel_y[1]),
-    # "ang_vel_z_min": torch.tensor(cfg.ranges.ang_vel_z[0]),
-    # "ang_vel_z_max": torch.tensor(cfg.ranges.ang_vel_z[1]),
+    "lin_vel_x_min": torch.tensor(cfg.ranges.lin_vel_x[0]),
+    "lin_vel_x_max": torch.tensor(cfg.ranges.lin_vel_x[1]),
+    "lin_vel_y_min": torch.tensor(cfg.ranges.lin_vel_y[0]),
+    "lin_vel_y_max": torch.tensor(cfg.ranges.lin_vel_y[1]),
+    "ang_vel_z_min": torch.tensor(cfg.ranges.ang_vel_z[0]),
+    "ang_vel_z_max": torch.tensor(cfg.ranges.ang_vel_z[1]),
   }
 
 

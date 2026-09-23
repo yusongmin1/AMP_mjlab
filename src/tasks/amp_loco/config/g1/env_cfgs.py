@@ -97,6 +97,7 @@ def g1_amp_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
   cfg.events["foot_friction"].params["asset_cfg"].geom_names = geom_names
   cfg.events["base_com"].params["asset_cfg"].body_names = ("torso_link",)
+  cfg.events["recovery_assist_force"].params["asset_cfg"].body_names = ("torso_link",)
 
   # Configure motion reset to sample from the entire motion with a delay.
   cfg.events["init_motion_loader"].params["delay_reset_env_ratio"] = 0.4
@@ -112,6 +113,7 @@ def g1_amp_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   cfg.events["init_motion_loader"].params["motion_dir"] = _motion_dir
   cfg.events["init_motion_loader"].params["recovery_dir"] = _recovery_dir
   cfg.events["reset_from_motion"].params["motion_dir"] = _motion_dir
+  cfg.events["reset_from_motion"].params["recovery_dir"] = _recovery_dir
 
   cfg.rewards["track_anchor_linear_velocity"].params["anchor_cfg"].body_names = (anchor_name,)
   cfg.rewards["track_anchor_angular_velocity"].params["anchor_cfg"].body_names = (anchor_name,)
@@ -123,23 +125,11 @@ def g1_amp_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   )
   cfg.rewards["body_ang_vel_xy_l2"].params["body_cfg"].body_names = (root_name,)
 
-  cfg.observations["critic"].terms["body_pos_b"].params["anchor_cfg"].body_names = (anchor_name,)
-  cfg.observations["critic"].terms["body_pos_b"].params["body_cfg"].body_names = body_names
- 
-  cfg.observations["critic"].terms["body_ori_b"].params["anchor_cfg"].body_names = (anchor_name,)
-  cfg.observations["critic"].terms["body_ori_b"].params["body_cfg"].body_names = body_names
+  cfg.observations["critic"].terms["frame"].params["anchor_cfg"].body_names = (anchor_name,)
+  cfg.observations["critic"].terms["frame"].params["body_cfg"].body_names = body_names
 
-  cfg.observations["amp"].terms["body_pos_b"].params["anchor_cfg"].body_names = (anchor_name,)
-  cfg.observations["amp"].terms["body_pos_b"].params["body_cfg"].body_names = body_names
-
-  cfg.observations["amp"].terms["body_ori_b"].params["anchor_cfg"].body_names = (anchor_name,)
-  cfg.observations["amp"].terms["body_ori_b"].params["body_cfg"].body_names = body_names
-
-  cfg.observations["amp"].terms["body_lin_vel_b"].params["anchor_cfg"].body_names = (anchor_name,)
-  cfg.observations["amp"].terms["body_lin_vel_b"].params["body_cfg"].body_names = body_names
-
-  cfg.observations["amp"].terms["body_ang_vel_b"].params["anchor_cfg"].body_names = (anchor_name,)
-  cfg.observations["amp"].terms["body_ang_vel_b"].params["body_cfg"].body_names = body_names
+  cfg.observations["amp"].terms["state"].params["anchor_cfg"].body_names = (anchor_name,)
+  cfg.observations["amp"].terms["state"].params["body_cfg"].body_names = body_names
 
   
 
@@ -150,6 +140,8 @@ def g1_amp_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
     cfg.observations["actor"].enable_corruption = False
     cfg.events.pop("push_robot", None)
+    # Drop curricula in play; recovery_assist_force event stays so the upward
+    # pull is still applied/visualized at the initial 250N (no decay).
     cfg.curriculum = {}
     cfg.events["randomize_terrain"] = EventTermCfg(
       func=envs_mdp.randomize_terrain,
@@ -187,8 +179,8 @@ def g1_amp_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   cfg.scene.sensors = tuple(
     s for s in (cfg.scene.sensors or ()) if s.name != "terrain_scan"
   )
-  del cfg.observations["actor"].terms["height_scan"]
-  del cfg.observations["critic"].terms["height_scan"]
+  cfg.observations["actor"].terms["frame"].params["include_height_scan"] = False
+  cfg.observations["critic"].terms["frame"].params["include_height_scan"] = False
 
   # Disable terrain curriculum (not present in play mode since rough clears all).
   cfg.curriculum.pop("terrain_levels", None)

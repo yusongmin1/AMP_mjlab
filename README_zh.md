@@ -48,25 +48,11 @@ cd rsl_rl
 python -m pip install -e .
 ```
 
-### 2. 应用 mjlab 补丁（可选）
+### 2. mjlab 观测补丁（已不再需要）
 
-如果不打这个补丁，则需要在代码中去掉 `history_ordering` 配置。
+观测已改为与 DroidUpE1 相同的**单 frame term** 设计（`actor_frame` / `critic_frame` / `amp_state`），原版 mjlab 的 history 展平即为帧优先，**无需再打 `history_ordering` 补丁**。
 
-补丁作用说明：
-
-- 增加了历史观测的展开方式选项，可选择按时间维(`time`)或按观测项(`term`)展开。
-- mjlab 默认仅支持按 `term` 展开。
-
-补丁文件：
-
-- `mjlab_patch/mjlab/managers/observation_manager.py`
-
-示例覆盖命令：
-
-```bash
-cp mjlab_patch/mjlab/managers/observation_manager.py \
-	/home/zju/miniconda3/envs/env_isaaclab/lib/python3.11/site-packages/mjlab/managers/observation_manager.py
-```
+`mjlab_patch/` 目录仅作历史参考；新环境不必覆盖 site-packages。
 
 ### 3. 查看可用任务
 
@@ -145,3 +131,10 @@ python scripts/csv_to_npz.py --help
 
 - 感谢 [unitreerobotics/unitree_rl_mjlab](https://github.com/unitreerobotics/unitree_rl_mjlab) 项目的开源工作与启发。
 - 感谢 [Open-X-Humanoid/TienKung-Lab](https://github.com/Open-X-Humanoid/TienKung-Lab)，本项目在 rsl_rl 的 AMP 部分参考了该实现。
+
+
+
+ <!-- 力矩课程，delay时间步，可视化  -->
+
+
+奖励 ，对称性，从初始姿态之外初始化 ，rsl_rl的算法修改 ，domain rand添加  obs改为关节角度以及关节速度
