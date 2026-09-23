@@ -117,19 +117,14 @@ def critic_frame(
 
 def amp_state(
   env: ManagerBasedRlEnv,
-  anchor_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=()),
-  body_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=()),
+  asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
 ) -> torch.Tensor:
-  """Discriminator observation packed as a single term."""
-  return torch.cat(
-    (
-      robot_body_pos_b(env, anchor_cfg=anchor_cfg, body_cfg=body_cfg),
-      robot_body_ori_b(env, anchor_cfg=anchor_cfg, body_cfg=body_cfg),
-      robot_body_lin_vel_b(env, anchor_cfg=anchor_cfg, body_cfg=body_cfg),
-      robot_body_ang_vel_b(env, anchor_cfg=anchor_cfg, body_cfg=body_cfg),
-    ),
-    dim=-1,
-  )
+  """Discriminator observation: ``[joint_pos, joint_vel]`` (absolute), matching AMPLoader."""
+  asset: Entity = env.scene[asset_cfg.name]
+  joint_ids = asset_cfg.joint_ids
+  joint_pos = asset.data.joint_pos[:, joint_ids]
+  joint_vel = asset.data.joint_vel[:, joint_ids]
+  return torch.cat((joint_pos, joint_vel), dim=-1)
 
 def robot_body_pos_b(
     env: ManagerBasedRlEnv,

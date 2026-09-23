@@ -99,8 +99,7 @@ def make_amp_env_cfg() -> ManagerBasedRlEnvCfg:
         "state": ObservationTermCfg(
           func=mdp.amp_state,
           params={
-            "anchor_cfg": SceneEntityCfg("robot", body_names=()),
-            "body_cfg": SceneEntityCfg("robot", body_names=()),
+            "asset_cfg": SceneEntityCfg("robot"),
           },
         ),
       },
@@ -258,7 +257,7 @@ def make_amp_env_cfg() -> ManagerBasedRlEnvCfg:
     "track_anchor_angular_velocity": RewardTermCfg(
       func=mdp.track_anchor_angular_velocity,
       weight=1.0,
-        params={"command_name": "twist", "std": 3.14,
+        params={"command_name": "twist", "std": 2.5,
                 "mask_delay": True,
                 "delay_env_rew_ratio": 0.0,
                 "anchor_cfg": SceneEntityCfg("robot", body_names=()),},
@@ -273,7 +272,7 @@ def make_amp_env_cfg() -> ManagerBasedRlEnvCfg:
     "body_ang_vel_xy_l2": RewardTermCfg(
       func=mdp.body_ang_vel_xy_l2,
       weight=0.5,
-        params={"std": 3.14,
+        params={"std": 2.5,
                 "mask_delay": True,
                 "delay_env_rew_ratio": 0.0,
                 "body_cfg": SceneEntityCfg("robot", body_names=("pelvis",)),},
@@ -362,8 +361,8 @@ def make_amp_env_cfg() -> ManagerBasedRlEnvCfg:
         "command_name": "twist",
         "velocity_stages": [
           {"step": 0, "lin_vel_x": (-0.5, 1.0), "lin_vel_y": (-0.5, 0.5), "ang_vel_z": (-1.0, 1.0)},
-          {"step": 5000 * 24, "lin_vel_x": (-1.0, 2.0), "lin_vel_y": (-1.0, 1.0)},
-          {"step": 10000 * 24, "lin_vel_x": (-1.5, 3.0), "lin_vel_y": (-1.0, 1.0), "ang_vel_z": (-3.14 / 2, 3.14 / 2)},
+          {"step": 5000 * 24, "lin_vel_x": (-1.0, 2.0), "lin_vel_y": (-0.5, 0.5)},
+          {"step": 10000 * 24, "lin_vel_x": (-1.5, 3.0), "lin_vel_y": (-0.5, 0.5), "ang_vel_z": (-3.14 / 2, 3.14 / 2)},
         ],
       },
     ),

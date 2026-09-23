@@ -27,8 +27,6 @@ class RslRlAmpRunnerCfg(RslRlOnPolicyRunnerCfg):
   amp_task_reward_lerp: float = 0.75
   amp_discr_hidden_dims: List[int] = field(default_factory=lambda: [1024, 512, 256])
   min_normalized_std: List[float] = field(default_factory=lambda: [0.05] * 29)
-  amp_body_names: tuple = ()
-  amp_anchor_name: str = ""
 
 
 def g1_amp_ppo_runner_cfg() -> RslRlAmpRunnerCfg:
@@ -76,20 +74,4 @@ def g1_amp_ppo_runner_cfg() -> RslRlAmpRunnerCfg:
     amp_task_reward_lerp=0.75,
     amp_discr_hidden_dims=[1024, 512, 256],
     min_normalized_std=[0.05] * 29,
-    amp_body_names=(
-      "pelvis",
-      "left_hip_roll_link",
-      "left_knee_link",
-      "left_ankle_roll_link",
-      "right_hip_roll_link",
-      "right_knee_link",
-      "right_ankle_roll_link",
-      "left_shoulder_roll_link",
-      "left_elbow_link",
-      "left_wrist_yaw_link",
-      "right_shoulder_roll_link",
-      "right_elbow_link",
-      "right_wrist_yaw_link",
-    ),
-    amp_anchor_name="torso_link",
   )

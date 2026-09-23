@@ -135,9 +135,6 @@ def g1_amp_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   cfg.observations["critic"].terms["frame"].params["anchor_cfg"].body_names = (anchor_name,)
   cfg.observations["critic"].terms["frame"].params["body_cfg"].body_names = body_names
 
-  cfg.observations["amp"].terms["state"].params["anchor_cfg"].body_names = (anchor_name,)
-  cfg.observations["amp"].terms["state"].params["body_cfg"].body_names = body_names
-
   
 
   # Apply play mode overrides.

@@ -157,16 +157,14 @@ class AmpOnPolicyRunner:
             # this is used by the symmetry function for handling different observation terms
             self.alg_cfg["symmetry_cfg"]["_env"] = env
 
-        # init amp loader
-        # Resolve all body names from the environment's robot entity
-        robot_entity = self.env.unwrapped.scene["robot"]
-        all_body_names = robot_entity.body_names
+        # init amp loader (joint_pos + joint_vel only, matching env amp_state)
         amp_data = AMPLoader(
             motion_file=train_cfg["amp_motion_files"],
-            body_names=train_cfg["amp_body_names"],
-            anchor_name=train_cfg["amp_anchor_name"],
-            all_body_names=all_body_names,
             device=self.device,
+        )
+        print(
+            f"[AMP] observation_dim={amp_data.observation_dim} "
+            f"(joint_pos+joint_vel, dof={amp_data.observation_dim // 2})"
         )
         amp_normalizer = Normalizer(amp_data.observation_dim)
         discriminator = Discriminator(
