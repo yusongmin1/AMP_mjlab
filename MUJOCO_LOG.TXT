@@ -70,3 +70,51 @@ WARNING Thu Sep 24 16:56:59 2026: Attach conflict when attaching 'go2' to 'mjlab
 impratio: parent has 1 (default), child has 100, keeping parent value
 cone: parent has 0 (default), child has 1, keeping parent value
 
+WARNING Thu Sep 24 17:01:06 2026: Attach conflict when attaching 'go2' to 'mjlab scene', policy is 'warning'
+impratio: parent has 1 (default), child has 100, keeping parent value
+cone: parent has 0 (default), child has 1, keeping parent value
+
+WARNING Thu Sep 24 17:02:56 2026: Attach conflict when attaching 'go2' to 'mjlab scene', policy is 'warning'
+impratio: parent has 1 (default), child has 100, keeping parent value
+cone: parent has 0 (default), child has 1, keeping parent value
+
+WARNING Thu Sep 24 17:03:05 2026: Attach conflict when attaching 'go2' to 'mjlab scene', policy is 'warning'
+impratio: parent has 1 (default), child has 100, keeping parent value
+cone: parent has 0 (default), child has 1, keeping parent value
+
+WARNING Thu Sep 24 17:05:31 2026: Attach conflict when attaching 'go2' to 'mjlab scene', policy is 'warning'
+impratio: parent has 1 (default), child has 100, keeping parent value
+cone: parent has 0 (default), child has 1, keeping parent value
+
+WARNING Thu Sep 24 17:14:04 2026: Attach conflict when attaching 'go2' to 'mjlab scene', policy is 'warning'
+impratio: parent has 1 (default), child has 100, keeping parent value
+cone: parent has 0 (default), child has 1, keeping parent value
+
+WARNING Thu Sep 24 17:14:27 2026: Attach conflict when attaching 'go2' to 'mjlab scene', policy is 'warning'
+impratio: parent has 1 (default), child has 100, keeping parent value
+cone: parent has 0 (default), child has 1, keeping parent value
+
+WARNING Thu Sep 24 17:19:04 2026: Attach conflict when attaching 'go2' to 'mjlab scene', policy is 'warning'
+impratio: parent has 1 (default), child has 100, keeping parent value
+cone: parent has 0 (default), child has 1, keeping parent value
+
+WARNING Thu Sep 24 17:21:32 2026: Attach conflict when attaching 'go2' to 'mjlab scene', policy is 'warning'
+impratio: parent has 1 (default), child has 100, keeping parent value
+cone: parent has 0 (default), child has 1, keeping parent value
+
+WARNING Thu Sep 24 17:29:03 2026: Attach conflict when attaching 'go2' to 'mjlab scene', policy is 'warning'
+impratio: parent has 1 (default), child has 100, keeping parent value
+cone: parent has 0 (default), child has 1, keeping parent value
+
+WARNING Thu Sep 24 18:27:57 2026: Attach conflict when attaching 'go2' to 'mjlab scene', policy is 'warning'
+impratio: parent has 1 (default), child has 100, keeping parent value
+cone: parent has 0 (default), child has 1, keeping parent value
+
+WARNING Thu Sep 24 18:31:20 2026: Attach conflict when attaching 'go2' to 'mjlab scene', policy is 'warning'
+impratio: parent has 1 (default), child has 100, keeping parent value
+cone: parent has 0 (default), child has 1, keeping parent value
+
+WARNING Thu Sep 24 18:57:21 2026: Attach conflict when attaching 'go2' to 'mjlab scene', policy is 'warning'
+impratio: parent has 1 (default), child has 100, keeping parent value
+cone: parent has 0 (default), child has 1, keeping parent value
+

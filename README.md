@@ -61,20 +61,26 @@ python scripts/list_envs.py --keyword AMP
 
 主要任务：
 
-- `Unitree-G1-AMP-Rough`
-- `Unitree-G1-AMP-Flat`
+- `Unitree-G1-AMP-Rough` / `Unitree-G1-AMP-Flat`
+- `Unitree-Go2-AMP-Rough` / `Unitree-Go2-AMP-Flat`
 
 ## 训练
 
+### G1
 
 ```bash
 python scripts/train.py Unitree-G1-AMP-Flat --env.scene.num-envs=4096
 ```
 
+日志默认在：`logs/rsl_rl/g1_amp_locomotion/<time_stamp_run>/`
 
-日志默认在：
+### Go2
 
-- `logs/rsl_rl/g1_amp_locomotion/<time_stamp_run>/`
+```bash
+python scripts/train.py Unitree-Go2-AMP-Flat --env.scene.num-envs=4096
+```
+
+日志默认在：`logs/rsl_rl/go2_amp_locomotion/<time_stamp_run>/`
 
 ### 断点续训（Resume）
 
@@ -86,15 +92,17 @@ python scripts/train.py Unitree-G1-AMP-Flat \
   --agent.load-checkpoint model_50000.pt
 ```
 
-- `--agent.load-run`：`logs/rsl_rl/g1_amp_locomotion/` 下的 run 目录名（支持正则；默认 `.*` 取匹配到的最新 run）
-- `--agent.load-checkpoint`：checkpoint 文件名（支持正则；默认 `model_.*.pt` 取匹配到的最新文件）
+Go2 同理，把任务名换成 `Unitree-Go2-AMP-Flat`，run 目录在 `logs/rsl_rl/go2_amp_locomotion/` 下。
+
+- `--agent.load-run`：对应 experiment 日志目录下的 run 名（支持正则；默认 `.*` 取最新）
+- `--agent.load-checkpoint`：checkpoint 文件名（支持正则；默认 `model_.*.pt` 取最新）
 
 按正则加载某次 run 的最新 checkpoint 示例：
 
 ```bash
 python scripts/train.py Unitree-G1-AMP-Flat \
   --env.scene.num-envs=4096 \
-  --agent.resume True \ 
+  --agent.resume True \
   --agent.load-run 2026-09-23_10-32-08 \
   --agent.load-checkpoint 'model_.*.pt'
 ```
@@ -108,29 +116,73 @@ python scripts/train.py Unitree-G1-AMP-Flat \
 
 ## 评估与可视化
 
-使用已训练权重回放：
+### Play（策略回放）
 
 ```bash
+# G1
 python scripts/play.py Unitree-G1-AMP-Flat
+
+# Go2
+python scripts/play.py Unitree-Go2-AMP-Flat
 ```
-sim2sim
+
+### Sim2Sim（手柄）
+
 ```bash
- python scripts/sim2sim_gamepad.py 
+# G1（默认读 logs/rsl_rl/g1_amp_locomotion 最新 ONNX）
+python scripts/sim2sim_gamepad.py
+
+# Go2（默认读 logs/rsl_rl/go2_amp_locomotion 最新 ONNX）
+python scripts/sim2sim_go2_gamepad.py
 ```
+
+指定权重：
+
+```bash
+python scripts/sim2sim_go2_gamepad.py --policy logs/rsl_rl/go2_amp_locomotion/<run>/policy.onnx
+```
+
+手柄：左摇杆前后/左右 = 线速度，右摇杆左右 = 偏航；RB/LB 调最大前进速度；B 重置，A+B 退出。
+
+### 动作 CSV 可视化
+
+```bash
+# G1 amp CSV
+python scripts/play_motion_csv.py
+
+# Go2 mocap CSV
+python scripts/play_motion_csv.py --robot go2
+```
+
 说明：训练与回放阶段都支持 ONNX 导出（默认开启）。
 
 ## 运动数据准备
 
-仓库提供 CSV 到 NPZ 的转换脚本：
+### G1
 
 ```bash
 python scripts/csv_to_npz.py --help
 ```
 
-推荐目录组织：
-
 - 原始 CSV：`motion_data_csv/amp`
 - 转换后 NPZ：`src/assets/motions/g1/amp/WalkandRun` 与 `src/assets/motions/g1/amp/Recovery`
+
+### Go2
+
+```bash
+# mocap txt → CSV
+python scripts/convert_go2_mocap_txt_to_csv.py
+
+# CSV → NPZ（25→50 Hz，示例）
+PYTHONPATH=. python scripts/convert_gc_go2.py \
+  --input-file src/assets/motions/go2/mocap_csv/forward_hip_sym.csv \
+  --output-name forward_hip_sym --input-fps 25 --output-fps 50 --device cuda:0 \
+  --output-file src/assets/motions/go2/amp/WalkandRun/forward_hip_sym.npz
+```
+
+- 原始 mocap：`My_unitree_go2_gym/datasets/mocap_motions_go2/`
+- CSV：`src/assets/motions/go2/mocap_csv/`
+- NPZ：`src/assets/motions/go2/amp/WalkandRun`（及 `Recovery` 占位）
 
 只要上述目录中存在可用 NPZ，训练配置会自动加载。
 
@@ -138,10 +190,13 @@ python scripts/csv_to_npz.py --help
 
 - `src/tasks/amp_loco`：AMP locomotion/recovery 任务实现
 - `src/tasks/amp_loco/config/g1`：G1 任务注册、环境与 RL 配置
+- `src/tasks/amp_loco/config/go2`：Go2 任务注册、环境与 RL 配置
 - `src/tasks/amp_loco/mdp`：奖励、观测、事件、终止逻辑
 - `scripts/train.py`：训练入口
 - `scripts/play.py`：回放入口
-- `scripts/csv_to_npz.py`：动作数据转换工具
+- `scripts/sim2sim_gamepad.py` / `sim2sim_go2_gamepad.py`：G1 / Go2 ONNX 手柄 sim2sim
+- `scripts/csv_to_npz.py`：G1 动作数据转换工具
+- `scripts/convert_go2_mocap_txt_to_csv.py` / `convert_gc_go2.py`：Go2 mocap→CSV→NPZ
 - `mjlab_patch`：依赖的 mjlab 本地补丁
 
 ## 项目亮点总结
@@ -156,8 +211,6 @@ python scripts/csv_to_npz.py --help
 - 感谢 [unitreerobotics/unitree_rl_mjlab](https://github.com/unitreerobotics/unitree_rl_mjlab) 项目的开源工作与启发。
 - 感谢 [Open-X-Humanoid/TienKung-Lab](https://github.com/Open-X-Humanoid/TienKung-Lab)，本项目在 rsl_rl 的 AMP 部分参考了该实现。
 
-
-
 ## 添加内容
 - [x] 力课程 ，倒地125帧后一个力矩给他拽起来，torso_link上，不是pers那个link,原因时这样拽起来机器人会近似直立
 - [x] 奖励修改 基座的重力投映限制，腿部关节的roll yaw限制
@@ -166,25 +219,4 @@ python scripts/csv_to_npz.py --help
 - [ ] domain rand扩大
 - [ ] 初始化重采样修改，不要完全在轨迹中采样，确保机器人器身的时候覆盖全部动作空间
 - [x] add go2 AMP（`Unitree-Go2-AMP-Flat/Rough`；mocap→CSV→NPZ；DR 沿用 tracking）
-
-### Go2 AMP 用法
-
-```bash
-# 1) mocap txt → CSV（已导出可跳过）
-python scripts/convert_go2_mocap_txt_to_csv.py
-
-# 2) CSV → NPZ（25→50 Hz）
-PYTHONPATH=. python scripts/convert_gc_go2.py \
-  --input-file src/assets/motions/go2/mocap_csv/forward_hip_sym.csv \
-  --output-name forward_hip_sym --input-fps 25 --output-fps 50 --device cuda:0 \
-  --output-file src/assets/motions/go2/amp/WalkandRun/forward_hip_sym.npz
-
-# 3) 训练 / 回放
-python scripts/train.py Unitree-Go2-AMP-Flat --env.scene.num-envs=4096
-python scripts/play.py Unitree-Go2-AMP-Flat
-
-# 回放原始 CSV
-python scripts/play_motion_csv.py --robot go2
-```
-
 

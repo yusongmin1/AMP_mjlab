@@ -1,8 +1,9 @@
 """Unitree Go2 AMP locomotion environment configurations.
 
-Builds on ``make_amp_env_cfg`` (AMP obs/rewards/motion reset) and applies Go2
-tracking-style domain randomization: DelayedActuator 0–3, foot friction,
-trunk COM, encoder bias, push ranges from tracking.
+Builds on ``make_amp_env_cfg`` (AMP obs/motion reset) and applies Go2
+tracking-style domain randomization. Rewards are Go2-only
+(``mdp/go2_rewards.py``, legged_lab_yu Go2AmpVae weights) — shared
+``mdp/rewards.py`` is left for G1.
 """
 
 from __future__ import annotations
@@ -16,12 +17,15 @@ from mjlab.envs import mdp as envs_mdp
 from mjlab.envs.mdp.actions import JointPositionActionCfg
 from mjlab.managers.event_manager import EventTermCfg
 from mjlab.managers.reward_manager import RewardTermCfg
+from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.sensor import ContactMatch, ContactSensorCfg, RayCastSensorCfg
-from mjlab.tasks.velocity import mdp
 from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
+from mjlab.envs.mdp import action_rate_l2, joint_acc_l2, joint_pos_limits
 from src.assets.robots import GO2_ACTION_SCALE, get_go2_robot_cfg
 from src.tasks.amp_loco.amp_env_cfg import make_amp_env_cfg
 from src.tasks.amp_loco.mdp.command import SpinningUniformVelocityCommandCfg
+from src.tasks.amp_loco.mdp import go2_rewards as go2_mdp
+from src.tasks.amp_loco.mdp.rewards import self_collision_cost
 
 # Tracking push / COM ranges (mjlab tracking_env_cfg.VELOCITY_RANGE + base_com).
 _TRACKING_PUSH_RANGE = {
@@ -69,7 +73,6 @@ def go2_amp_rough_env_cfg(
       sensor.frame.name = "trunk"
 
   foot_names = ("FR", "FL", "RR", "RL")
-  site_names = ("FR", "FL", "RR", "RL")
   geom_names = tuple(f"{n}_foot_collision" for n in foot_names)
   body_names = (
     "trunk",
@@ -87,7 +90,6 @@ def go2_amp_rough_env_cfg(
     "RR_foot",
   )
   anchor_name = "trunk"
-  root_name = "trunk"
 
   feet_ground_cfg = ContactSensorCfg(
     name="feet_ground_contact",
@@ -178,19 +180,68 @@ def go2_amp_rough_env_cfg(
   cfg.events["reset_from_motion"].params["motion_dir"] = _motion_dir
   cfg.events["reset_from_motion"].params["recovery_dir"] = _recovery_dir
 
-  cfg.rewards["track_anchor_linear_velocity"].params["anchor_cfg"].body_names = (anchor_name,)
-  cfg.rewards["track_anchor_angular_velocity"].params["anchor_cfg"].body_names = (anchor_name,)
-  cfg.rewards["foot_slip"].params["asset_cfg"].site_names = site_names
-  cfg.rewards["self_collisions"] = RewardTermCfg(
-    func=mdp.self_collision_cost,
-    weight=-0.1,
-    params={"sensor_name": self_collision_cfg.name, "force_threshold": 10.0},
-  )
-  cfg.rewards["body_ang_vel_xy_l2"].params["body_cfg"].body_names = (root_name,)
-  # Keep only root projected-gravity flatness (drop body_orientation + hip deviation).
-  cfg.rewards.pop("body_orientation_l2", None)
-  cfg.rewards.pop("joint_deviation_hip", None)
-  cfg.rewards["flat_orientation_l2"].weight = -0.2
+  # Go2-only rewards (legged_lab_yu Go2AmpVae); leave shared amp_env_cfg rewards for G1.
+  cfg.rewards = {
+    "track_lin_vel_xy_exp": RewardTermCfg(
+      func=go2_mdp.track_lin_vel_xy_yaw_frame_exp,
+      weight=1.0,
+      params={"std": 0.5, "command_name": "twist"},
+    ),
+    "track_ang_vel_z_exp": RewardTermCfg(
+      func=go2_mdp.track_ang_vel_z_world_exp,
+      weight=0.5,
+      params={"std": 0.5, "command_name": "twist"},
+    ),
+    "lin_vel_z_l2": RewardTermCfg(
+      func=go2_mdp.lin_vel_z_l2,
+      weight=-2.0,
+    ),
+    "base_height": RewardTermCfg(
+      func=go2_mdp.base_height_above_terrain,
+      weight=-5.0,
+      params={"target_height": 0.38, "region_size": (0.4, 0.4)},
+    ),
+    "ang_vel_xy_l2": RewardTermCfg(
+      func=go2_mdp.ang_vel_xy_l2,
+      weight=-0.05,
+    ),
+    # "energy": RewardTermCfg(
+    #   func=go2_mdp.energy,
+    #   weight=-1e-3,
+    # ),
+    "dof_acc_l2": RewardTermCfg(func=joint_acc_l2, weight=-2.5e-7),
+    "action_rate_l2": RewardTermCfg(func=action_rate_l2, weight=-0.01),
+    "action_smoothness_l2": RewardTermCfg(
+      func=go2_mdp.action_smoothness_l2,
+      weight=-0.01,
+    ),
+    "self_collisions": RewardTermCfg(
+      func=self_collision_cost,
+      weight=-0.1,
+      params={"sensor_name": self_collision_cfg.name, "force_threshold": 10.0},
+    ),
+    "flat_orientation_l2": RewardTermCfg(
+      func=go2_mdp.flat_orientation_l2,
+      weight=-0.2,
+    ),
+    "dof_pos_limits": RewardTermCfg(func=joint_pos_limits, weight=-2.0),
+    "joint_deviation_hip": RewardTermCfg(
+      func=go2_mdp.joint_deviation_l1,
+      weight=-0.1,
+      params={
+        "asset_cfg": SceneEntityCfg("robot", joint_names=(".*_hip_joint",)),
+      },
+    ),
+    # "stand_still_without_cmd": RewardTermCfg(
+    #   func=go2_mdp.stand_still_without_cmd,
+    #   weight=-0.5,
+    #   params={
+    #     "command_name": "twist",
+    #     "command_threshold": 0.1,
+    #     "asset_cfg": SceneEntityCfg("robot", joint_names=(".*",)),
+    #   },
+    # ),
+  }
 
   # Standing height ~0.28–0.35 m; terminate if collapsed.
   cfg.terminations["bad_base_height"].params["minimum_height"] = 0.12
@@ -202,8 +253,8 @@ def go2_amp_rough_env_cfg(
   if "command_vel" in cfg.curriculum:
     cfg.curriculum["command_vel"].params["velocity_stages"] = [
       {"step": 0, "lin_vel_x": (-0.5, 1.0), "lin_vel_y": (-0.5, 0.5), "ang_vel_z": (-1.0, 1.0)},
-      {"step": 5000 * 24, "lin_vel_x": (-1.0, 1.5), "lin_vel_y": (-0.5, 0.5)},
-      {"step": 10000 * 24, "lin_vel_x": (-1.5, 2.0), "lin_vel_y": (-0.8, 0.8), "ang_vel_z": (-1.5, 1.5)},
+      {"step": 2000 * 24, "lin_vel_x": (-1.0, 1.5), "lin_vel_y": (-1.0, 1.0)},
+      {"step": 5000 * 24, "lin_vel_x": (-2.0, 2.0),  "ang_vel_z": (-1.5, 1.5)},
     ]
 
   if play:
