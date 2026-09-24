@@ -96,7 +96,7 @@ class GamepadCommand:
   RB/LB change the forward max speed (gears) live by ±0.5 m/s.
   """
 
-  def __init__(self, deadzone: float = 0.15, max_speed: float = 3.0, yaw_axis: int = 2) -> None:
+  def __init__(self, deadzone: float = 0.15, max_speed: float = 3.0, yaw_axis: int = 3) -> None:
     os_env_backup = None
     import os
 
@@ -178,7 +178,8 @@ class GamepadCommand:
     back_gears = max(1, int(round(fwd_gears * MAX_BACKWARD_GEAR / MAX_FORWARD_GEAR)))
     cmd_x = _gear(-ly, self.deadzone, fwd_gears if -ly >= 0 else back_gears)
     cmd_y = _gear(-lx, self.deadzone, MAX_LATERAL_GEAR)
-    cmd_yaw = _gear(-rx, self.deadzone, MAX_YAW_GEAR)
+    # Stick right → positive yaw (no sign flip; previous -rx was inverted).
+    cmd_yaw = _gear(rx, self.deadzone, MAX_YAW_GEAR)
     return np.asarray((cmd_x, cmd_y, cmd_yaw), dtype=np.float32)
 
 
@@ -484,7 +485,7 @@ def parse_args() -> argparse.Namespace:
   parser.add_argument("--gamepad", action=argparse.BooleanOptionalAction, default=True)
   parser.add_argument("--deadzone", type=float, default=0.15)
   parser.add_argument("--max-speed", type=float, default=3.0, help="Initial forward max speed (m/s); RB/LB change it live")
-  parser.add_argument("--yaw-axis", type=int, default=2, help="Gamepad axis used for yaw (fallback: D-pad left/right)")
+  parser.add_argument("--yaw-axis", type=int, default=3, help="Gamepad axis used for yaw (USB pads: 3=right stick X; fallback: D-pad left/right)")
   parser.add_argument("--command", type=float, nargs=3, default=(0.0, 0.0, 0.0))
   parser.add_argument("--sim-dt", type=float, default=0.005)
   parser.add_argument("--decimation", type=int, default=4)

@@ -58,15 +58,19 @@ class AMPPPO:
         desired_kl=0.01,
         device="cpu",
         normalize_advantage_per_mini_batch=False,
-        optimizer: str = "adam",
         # RND parameters
         rnd_cfg: dict | None = None,
         # Symmetry parameters
         symmetry_cfg: dict | None = None,
         # Distributed training parameters
         multi_gpu_cfg: dict | None = None,
-        share_cnn_encoders=False,
+        **kwargs,
     ):
+        if kwargs:
+            print(
+                "AMPPPO.__init__ got unexpected arguments, which will be ignored: "
+                + str([key for key in kwargs.keys()])
+            )
         # device-related parameters
         self.device = device
         self.is_multi_gpu = multi_gpu_cfg is not None
@@ -566,71 +570,6 @@ class AMPPPO:
         self.policy.load_state_dict(model_params[0])
         if self.rnd:
             self.rnd.predictor.load_state_dict(model_params[1])
-
-    def get_policy(self):
-        """Return the policy module."""
-        return self.policy
-
-    def save(self) -> dict:
-        """Serialize algorithm state for checkpointing (v5 format)."""
-        sd = self.policy.state_dict()
-        actor_sd, critic_sd = {}, {}
-        for k, v in sd.items():
-            if k == "std":
-                actor_sd["distribution.std_param"] = v
-            elif k.startswith("actor."):
-                actor_sd["mlp." + k[len("actor."):]] = v
-            elif k.startswith("critic."):
-                critic_sd["mlp." + k[len("critic."):]] = v
-        result = {
-            "actor_state_dict": actor_sd,
-            "critic_state_dict": critic_sd,
-            "optimizer_state_dict": self.optimizer.state_dict(),
-            "discriminator_state_dict": self.discriminator.state_dict(),
-            "amp_normalizer": self.amp_normalizer,
-        }
-        return result
-
-    def load(self, loaded_dict: dict, load_cfg: dict | None = None, strict: bool = True) -> bool:
-        """Load algorithm state from a checkpoint dict (v5 format).
-
-        Returns True if training should be considered resumed (i.e. all parts loaded).
-        """
-        load_cfg = load_cfg or {}
-        load_actor = load_cfg.get("actor", True)
-        load_critic = load_cfg.get("critic", load_actor)
-
-        sd = self.policy.state_dict()
-
-        if load_actor and "actor_state_dict" in loaded_dict:
-            actor_sd = loaded_dict["actor_state_dict"]
-            for k, v in actor_sd.items():
-                if k == "distribution.std_param" and "std" in sd:
-                    sd["std"] = v
-                elif k.startswith("mlp."):
-                    mapped = "actor." + k[len("mlp."):]
-                    if mapped in sd:
-                        sd[mapped] = v
-                elif k.startswith("distribution.log_std_param") and "std" in sd:
-                    sd["std"] = v.exp()
-
-        if load_critic and "critic_state_dict" in loaded_dict:
-            critic_sd = loaded_dict["critic_state_dict"]
-            for k, v in critic_sd.items():
-                if k.startswith("mlp."):
-                    mapped = "critic." + k[len("mlp."):]
-                    if mapped in sd:
-                        sd[mapped] = v
-
-        self.policy.load_state_dict(sd, strict=strict)
-
-        # Load discriminator and AMP normalizer if present
-        if "discriminator_state_dict" in loaded_dict:
-            self.discriminator.load_state_dict(loaded_dict["discriminator_state_dict"])
-        if "amp_normalizer" in loaded_dict:
-            self.amp_normalizer = loaded_dict["amp_normalizer"]
-
-        return load_actor and load_critic
 
     def reduce_parameters(self):
         """Collect gradients from all GPUs and average them.

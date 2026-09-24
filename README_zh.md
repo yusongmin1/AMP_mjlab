@@ -77,6 +77,29 @@ python scripts/train.py Unitree-G1-AMP-Flat --env.scene.num-envs=4096
 
 - `logs/rsl_rl/g1_amp_locomotion/<time_stamp_run>/`
 
+### 断点续训（Resume）
+
+```bash
+python scripts/train.py Unitree-G1-AMP-Flat \
+  --env.scene.num-envs=4096 \
+  --agent.resume True \
+  --agent.load-run 2026-09-23_10-32-08 \
+  --agent.load-checkpoint model_50000.pt
+```
+
+- `--agent.load-run`：`logs/rsl_rl/g1_amp_locomotion/` 下的 run 目录名（支持正则；默认 `.*` 取匹配到的最新 run）
+- `--agent.load-checkpoint`：checkpoint 文件名（支持正则；默认 `model_.*.pt` 取匹配到的最新文件）
+
+按正则加载某次 run 的最新 checkpoint 示例：
+
+```bash
+python scripts/train.py Unitree-G1-AMP-Flat \
+  --env.scene.num-envs=4096 \
+  --agent.resume True \
+  --agent.load-run 2026-09-23_10-32-08 \
+  --agent.load-checkpoint 'model_.*.pt'
+```
+
 ## 训练曲线说明（重要）
 
 - 在约 `2w` 轮（约 20k iterations）附近，策略通常会突然学会“跌倒后恢复”行为。

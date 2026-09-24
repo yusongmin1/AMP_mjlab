@@ -61,9 +61,13 @@ class PPO:
         symmetry_cfg: dict | None = None,
         # Distributed training parameters
         multi_gpu_cfg: dict | None = None,
-        share_cnn_encoders=False,
-        optimizer: str = "adam",
+        **kwargs,
     ):
+        if kwargs:
+            print(
+                "PPO.__init__ got unexpected arguments, which will be ignored: "
+                + str([key for key in kwargs.keys()])
+            )
         # device-related parameters
         self.device = device
         self.is_multi_gpu = multi_gpu_cfg is not None

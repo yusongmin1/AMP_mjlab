@@ -75,6 +75,29 @@ Logs are saved by default to:
 
 - `logs/rsl_rl/g1_amp_locomotion/<time_stamp_run>/`
 
+### Resume Training
+
+```bash
+python scripts/train.py Unitree-G1-AMP-Flat \
+  --env.scene.num-envs=4096 \
+  --agent.resume True \
+  --agent.load-run 2026-09-23_10-32-08 \
+  --agent.load-checkpoint model_50000.pt
+```
+
+- `--agent.load-run`: run directory name under `logs/rsl_rl/g1_amp_locomotion/` (regex allowed; default `.*` picks the latest matching run)
+- `--agent.load-checkpoint`: checkpoint filename (regex allowed; default `model_.*.pt` picks the latest matching file)
+
+Example with regex (latest checkpoint in a specific run):
+
+```bash
+python scripts/train.py Unitree-G1-AMP-Flat \
+  --env.scene.num-envs=4096 \
+  --agent.resume True \
+  --agent.load-run 2026-09-23_10-32-08 \
+  --agent.load-checkpoint 'model_.*.pt'
+```
+
 ## Training Curve Note (Important)
 
 - Around `2w` iterations (about 20k), the policy often suddenly learns fall-recovery behavior.

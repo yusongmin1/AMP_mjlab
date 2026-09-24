@@ -155,19 +155,36 @@ def body_ang_vel_xy_l2(
 def body_orientation_l2(
   env: ManagerBasedRlEnv,
   asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+  mask_delay: bool = False,
+  delay_env_rew_ratio: float = 1.0,
 ) -> torch.Tensor:
   """Penalize non-upright orientation of a selected body (e.g. torso).
 
   Uses projected gravity xy in that body's frame; falls back to root if no
-  body_ids are set.
+  body_ids are set. When ``mask_delay`` is True, delay/recovery (fallen) envs
+  are scaled by ``delay_env_rew_ratio`` (typically 0 to disable while down).
   """
   asset: Entity = env.scene[asset_cfg.name]
   if asset_cfg.body_ids:
     body_quat_w = asset.data.body_link_quat_w[:, asset_cfg.body_ids, :]
     body_quat_w = body_quat_w.squeeze(1)
     projected_gravity_b = quat_apply_inverse(body_quat_w, asset.data.gravity_vec_w)
-    return torch.sum(torch.square(projected_gravity_b[:, :2]), dim=1)
-  return torch.sum(torch.square(asset.data.projected_gravity_b[:, :2]), dim=1)
+    reward = torch.sum(torch.square(projected_gravity_b[:, :2]), dim=1)
+  else:
+    reward = torch.sum(torch.square(asset.data.projected_gravity_b[:, :2]), dim=1)
+  return _apply_delay_env_reward_scaling(env, reward, mask_delay, delay_env_rew_ratio)
+
+
+def flat_orientation_l2(
+  env: ManagerBasedRlEnv,
+  asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+  mask_delay: bool = False,
+  delay_env_rew_ratio: float = 1.0,
+) -> torch.Tensor:
+  """Penalize non-flat base orientation; disabled on delay/recovery envs when masked."""
+  asset: Entity = env.scene[asset_cfg.name]
+  reward = torch.sum(torch.square(asset.data.projected_gravity_b[:, :2]), dim=1)
+  return _apply_delay_env_reward_scaling(env, reward, mask_delay, delay_env_rew_ratio)
 
 
 def track_root_height(

@@ -280,28 +280,36 @@ def make_amp_env_cfg() -> ManagerBasedRlEnvCfg:
     "body_orientation_l2": RewardTermCfg(
       func=mdp.body_orientation_l2,
       weight=-2.0,
-      params={"asset_cfg": SceneEntityCfg("robot", body_names=())},  # Set per-robot (torso).
+      params={
+        "asset_cfg": SceneEntityCfg("robot", body_names=()),  # Set per-robot (torso).
+        "mask_delay": True,
+        "delay_env_rew_ratio": 0.0,
+      },
     ),
     "flat_orientation_l2": RewardTermCfg(
       func=mdp.flat_orientation_l2,
       weight=-1.0,
-      params={"asset_cfg": SceneEntityCfg("robot")},
+      params={
+        "asset_cfg": SceneEntityCfg("robot"),
+        "mask_delay": True,
+        "delay_env_rew_ratio": 0.0,
+      },
     ),
     
     "is_terminated": RewardTermCfg(func=mdp.is_terminated, weight=-200.0),
     "joint_acc_l2": RewardTermCfg(func=mdp.joint_acc_l2, weight=-2.5e-7),
     "joint_pos_limits": RewardTermCfg(func=mdp.joint_pos_limits, weight=-10.0),
     "action_rate_l2": RewardTermCfg(func=mdp.action_rate_l2, weight=-0.01),
-    "feet_too_near": RewardTermCfg(
-      func=mdp.feet_too_near,
-      weight=-2.0,
-      params={
-        "asset_cfg": SceneEntityCfg("robot", body_names=()),  # Set per-robot.
-        "threshold": 0.15,
-        "mask_delay": True,
-        "delay_env_rew_ratio": 0.0,
-      },
-    ),
+    # "feet_too_near": RewardTermCfg(
+    #   func=mdp.feet_too_near,
+    #   weight=-2.0,
+    #   params={
+    #     "asset_cfg": SceneEntityCfg("robot", body_names=()),  # Set per-robot.
+    #     "threshold": 0.15,
+    #     "mask_delay": True,
+    #     "delay_env_rew_ratio": 0.0,
+    #   },
+    # ),
     "joint_deviation_hip": RewardTermCfg(
       func=mdp.joint_deviation_l1,
       weight=-0.15,

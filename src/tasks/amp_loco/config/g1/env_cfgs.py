@@ -125,7 +125,7 @@ def g1_amp_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   )
   cfg.rewards["body_ang_vel_xy_l2"].params["body_cfg"].body_names = (root_name,)
   cfg.rewards["body_orientation_l2"].params["asset_cfg"].body_names = (".*torso.*",)
-  cfg.rewards["feet_too_near"].params["asset_cfg"].body_names = (".*ankle_roll.*",)
+  # cfg.rewards["feet_too_near"].params["asset_cfg"].body_names = (".*ankle_roll.*",)
   cfg.rewards["joint_deviation_hip"].params["asset_cfg"].joint_names = (
     ".*_hip_yaw.*",
     ".*_hip_roll.*",
