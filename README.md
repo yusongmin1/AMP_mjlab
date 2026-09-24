@@ -165,6 +165,26 @@ python scripts/csv_to_npz.py --help
 - [x] amp obs修改 ，obs改为关节角度以及关节速度
 - [ ] domain rand扩大
 - [ ] 初始化重采样修改，不要完全在轨迹中采样，确保机器人器身的时候覆盖全部动作空间
-- [ ] add go2
+- [x] add go2 AMP（`Unitree-Go2-AMP-Flat/Rough`；mocap→CSV→NPZ；DR 沿用 tracking）
+
+### Go2 AMP 用法
+
+```bash
+# 1) mocap txt → CSV（已导出可跳过）
+python scripts/convert_go2_mocap_txt_to_csv.py
+
+# 2) CSV → NPZ（25→50 Hz）
+PYTHONPATH=. python scripts/convert_gc_go2.py \
+  --input-file src/assets/motions/go2/mocap_csv/forward_hip_sym.csv \
+  --output-name forward_hip_sym --input-fps 25 --output-fps 50 --device cuda:0 \
+  --output-file src/assets/motions/go2/amp/WalkandRun/forward_hip_sym.npz
+
+# 3) 训练 / 回放
+python scripts/train.py Unitree-Go2-AMP-Flat --env.scene.num-envs=4096
+python scripts/play.py Unitree-Go2-AMP-Flat
+
+# 回放原始 CSV
+python scripts/play_motion_csv.py --robot go2
+```
 
 

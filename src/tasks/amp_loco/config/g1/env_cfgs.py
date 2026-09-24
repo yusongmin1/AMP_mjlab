@@ -2,10 +2,12 @@
 
 import os
 
+from mjlab.actuator import DelayedActuatorCfg
 from src.assets.robots import (
   G1_ACTION_SCALE,
   get_g1_robot_cfg,
 )
+from mjlab.entity import EntityArticulationInfoCfg
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs import mdp as envs_mdp
 from mjlab.envs.mdp.actions import JointPositionActionCfg
@@ -16,8 +18,17 @@ from mjlab.tasks.velocity import mdp
 from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
 from src.tasks.amp_loco.amp_env_cfg import make_amp_env_cfg
 
-def g1_amp_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
-  """Create Unitree G1 rough terrain velocity configuration."""
+def g1_amp_rough_env_cfg(
+  play: bool = False,
+  enable_actuator_delay: bool = True,
+) -> ManagerBasedRlEnvCfg:
+  """Create Unitree G1 rough terrain AMP configuration.
+
+  Args:
+    play: Interactive play overrides (no push / obs noise / curricula).
+    enable_actuator_delay: Wrap actuators with 0–3 physics-step command delay
+      (train only; disabled automatically when ``play=True``).
+  """
   cfg = make_amp_env_cfg()
 
   # Keep CCD high enough for stability but avoid Warp OOM from excessive EPA buffers.
@@ -25,7 +36,23 @@ def g1_amp_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   cfg.sim.contact_sensor_maxmatch = 500
   cfg.sim.nconmax = 48
 
-  cfg.scene.entities = {"robot": get_g1_robot_cfg()}
+  robot_cfg = get_g1_robot_cfg()
+  if enable_actuator_delay and not play:
+    articulation = robot_cfg.articulation
+    assert articulation is not None
+    robot_cfg.articulation = EntityArticulationInfoCfg(
+      actuators=tuple(
+        DelayedActuatorCfg(
+          base_cfg=act,
+          delay_target="position",
+          delay_min_lag=0,
+          delay_max_lag=3,
+        )
+        for act in articulation.actuators
+      ),
+      soft_joint_pos_limit_factor=articulation.soft_joint_pos_limit_factor,
+    )
+  cfg.scene.entities = {"robot": robot_cfg}
 
   # Set raycast sensor frame to G1 pelvis.
   for sensor in cfg.scene.sensors or ():
@@ -97,6 +124,7 @@ def g1_amp_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
   cfg.events["foot_friction"].params["asset_cfg"].geom_names = geom_names
   cfg.events["base_com"].params["asset_cfg"].body_names = ("torso_link",)
+  cfg.events["add_base_mass"].params["asset_cfg"].body_names = ("torso_link",)
   cfg.events["recovery_assist_force"].params["asset_cfg"].body_names = ("torso_link",)
 
   # Configure motion reset to sample from the entire motion with a delay.
@@ -166,9 +194,12 @@ def g1_amp_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   return cfg
 
 
-def g1_amp_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
-  """Create Unitree G1 flat terrain velocity configuration."""
-  cfg = g1_amp_rough_env_cfg(play=play)
+def g1_amp_flat_env_cfg(
+  play: bool = False,
+  enable_actuator_delay: bool = True,
+) -> ManagerBasedRlEnvCfg:
+  """Create Unitree G1 flat terrain AMP configuration."""
+  cfg = g1_amp_rough_env_cfg(play=play, enable_actuator_delay=enable_actuator_delay)
 
   cfg.sim.njmax = 640
   cfg.sim.mujoco.ccd_iterations = 50

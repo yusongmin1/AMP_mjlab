@@ -41,6 +41,11 @@ class UnitreeActuator(Actuator):
 
     cfg: UnitreeActuatorCfg
 
+    stiffness: torch.Tensor | None
+    damping: torch.Tensor | None
+    default_stiffness: torch.Tensor | None
+    default_damping: torch.Tensor | None
+
     _joint_vel: torch.Tensor
     _effort_y1: torch.Tensor
     _effort_y2: torch.Tensor
@@ -49,6 +54,19 @@ class UnitreeActuator(Actuator):
     _friction_static: torch.Tensor
     _friction_dynamic: torch.Tensor
     _activation_vel: torch.Tensor
+
+    def __init__(
+        self,
+        cfg: UnitreeActuatorCfg,
+        entity: Entity,
+        target_ids: list[int],
+        target_names: list[str],
+    ) -> None:
+        super().__init__(cfg, entity, target_ids, target_names)
+        self.stiffness = None
+        self.damping = None
+        self.default_stiffness = None
+        self.default_damping = None
 
     def edit_spec(self, spec: mujoco.MjSpec, target_names: list[str]) -> None:
         # Add MuJoCo builtin <position> actuators, one per target.
@@ -72,6 +90,16 @@ class UnitreeActuator(Actuator):
         num_joints = len(self.target_names)
         shape = (num_envs, num_joints)
 
+        # Per-env PD (for domain randomization via set_gains).
+        self.stiffness = torch.full(
+            shape, self.cfg.stiffness, dtype=torch.float, device=device
+        )
+        self.damping = torch.full(
+            shape, self.cfg.damping, dtype=torch.float, device=device
+        )
+        self.default_stiffness = self.stiffness.clone()
+        self.default_damping = self.damping.clone()
+
         self._joint_vel = torch.zeros(shape, dtype=torch.float, device=device)
         self._effort_y1 = torch.full(shape, self.cfg.Y1, dtype=torch.float, device=device)
         self._effort_y2 = torch.full(
@@ -87,12 +115,15 @@ class UnitreeActuator(Actuator):
         self._activation_vel = torch.full(shape, self.cfg.Va, dtype=torch.float, device=device)
 
     def compute(self, cmd: ActuatorCmd) -> torch.Tensor:
+        assert self.stiffness is not None
+        assert self.damping is not None
+
         # Save current joint velocity for torque-speed clipping.
         self._joint_vel[:] = cmd.vel
 
         # Compute desired effort with PD + feedforward, then apply custom limits.
-        effort = self.cfg.stiffness * (cmd.position_target - cmd.pos)
-        effort += self.cfg.damping * (cmd.velocity_target - cmd.vel)
+        effort = self.stiffness * (cmd.position_target - cmd.pos)
+        effort += self.damping * (cmd.velocity_target - cmd.vel)
         effort += cmd.effort_target
         effort = self._clip_effort(effort)
 
@@ -102,11 +133,28 @@ class UnitreeActuator(Actuator):
             + self._friction_dynamic * cmd.vel
         )
 
-        # BuiltinPositionActuator expects a position control signal.
-        kp = torch.as_tensor(self.cfg.stiffness, dtype=cmd.pos.dtype, device=cmd.pos.device)
-        kd = torch.as_tensor(self.cfg.damping, dtype=cmd.pos.dtype, device=cmd.pos.device)
-        kp = torch.clamp(kp, min=1e-6)
-        return cmd.pos + (effort + kd * cmd.vel) / kp
+        # Convert effort to an equivalent position command for the MuJoCo
+        # <position> actuator created in edit_spec.
+        kp = torch.clamp(self.stiffness, min=1e-6)
+        return cmd.pos + (effort + self.damping * cmd.vel) / kp
+
+    def set_gains(
+        self,
+        env_ids: torch.Tensor | slice,
+        kp: torch.Tensor | None = None,
+        kd: torch.Tensor | None = None,
+    ) -> None:
+        """Set per-env PD gains (used by domain randomization)."""
+        assert self.stiffness is not None
+        assert self.damping is not None
+        if kp is not None:
+            if kp.ndim == 1:
+                kp = kp.unsqueeze(-1)
+            self.stiffness[env_ids] = kp
+        if kd is not None:
+            if kd.ndim == 1:
+                kd = kd.unsqueeze(-1)
+            self.damping[env_ids] = kd
 
     def _clip_effort(self, effort: torch.Tensor) -> torch.Tensor:
         # check if the effort is the same direction as the joint velocity

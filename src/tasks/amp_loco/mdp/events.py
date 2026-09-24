@@ -1,21 +1,91 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import torch
 
+from mjlab.actuator.delayed_actuator import DelayedActuator
 from mjlab.entity import Entity
+from mjlab.envs.mdp.dr._types import resolve_distribution
 from mjlab.managers.scene_entity_config import SceneEntityCfg
 
 if TYPE_CHECKING:
     from mjlab.envs import ManagerBasedRlEnv
     from mjlab.viewer.debug_visualizer import DebugVisualizer
 
+from src.assets.robots.unitree_g1.unitree_actuators import UnitreeActuator
 from src.tasks.amp_loco.ampmotion_loader import MotionLoader
 from src.tasks.amp_loco.mdp.terminations import DelayedTerminationManager
 
 _DEFAULT_ASSET_CFG = SceneEntityCfg("robot")
+
+
+def randomize_actuator_gains(
+  env: ManagerBasedRlEnv,
+  env_ids: torch.Tensor | None,
+  kp_range: tuple[float, float] = (0.9, 1.1),
+  kd_range: tuple[float, float] = (0.9, 1.1),
+  asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+  distribution: Literal["uniform", "log_uniform"] = "log_uniform",
+  operation: Literal["scale", "abs"] = "scale",
+) -> None:
+  """Randomize UnitreeActuator PD gains (per-env tensors via set_gains).
+
+  ``dr.pd_gains`` only supports BuiltinPosition / IdealPd; G1 uses
+  ``UnitreeActuator`` which computes PD in Python.
+  """
+  asset: Entity = env.scene[asset_cfg.name]
+
+  if env_ids is None:
+    env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.int)
+  else:
+    env_ids = env_ids.to(env.device, dtype=torch.int)
+
+  if isinstance(asset_cfg.actuator_ids, list):
+    actuators = [asset.actuators[i] for i in asset_cfg.actuator_ids]
+  elif isinstance(asset_cfg.actuator_ids, slice):
+    actuators = asset.actuators[asset_cfg.actuator_ids]
+  else:
+    actuators = [asset.actuators[asset_cfg.actuator_ids]]
+
+  dist = resolve_distribution(distribution)
+
+  for actuator in actuators:
+    base = actuator.base_actuator if isinstance(actuator, DelayedActuator) else actuator
+    if not isinstance(base, UnitreeActuator):
+      raise TypeError(
+        f"randomize_actuator_gains expects UnitreeActuator, got {type(base).__name__}"
+      )
+    assert base.default_stiffness is not None
+    assert base.default_damping is not None
+
+    n_ctrl = base.default_stiffness.shape[1]
+    kp_samples = dist.sample(
+      torch.tensor(kp_range[0], device=env.device),
+      torch.tensor(kp_range[1], device=env.device),
+      (len(env_ids), n_ctrl),
+      env.device,
+    )
+    kd_samples = dist.sample(
+      torch.tensor(kd_range[0], device=env.device),
+      torch.tensor(kd_range[1], device=env.device),
+      (len(env_ids), n_ctrl),
+      env.device,
+    )
+    if operation == "scale":
+      base.set_gains(
+        env_ids,
+        kp=base.default_stiffness[env_ids] * kp_samples,
+        kd=base.default_damping[env_ids] * kd_samples,
+      )
+    elif operation == "abs":
+      base.set_gains(env_ids, kp=kp_samples, kd=kd_samples)
+    else:
+      raise ValueError(f"Unsupported operation: {operation}")
+
+
+# Keep MotionResetManager and other event helpers below.
 
 
 class MotionResetManager:

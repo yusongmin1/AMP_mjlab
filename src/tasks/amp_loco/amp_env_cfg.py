@@ -227,6 +227,43 @@ def make_amp_env_cfg() -> ManagerBasedRlEnvCfg:
         },
       },
     ),
+    "add_base_mass": EventTermCfg(
+      mode="reset",
+      func=dr.body_mass,
+      params={
+        "asset_cfg": SceneEntityCfg("robot", body_names=()),  # Set per-robot (torso).
+        "operation": "add",
+        "ranges": (-1.0, 1.0),
+      },
+    ),
+    "add_mass": EventTermCfg(
+      mode="reset",
+      func=dr.body_mass,
+      params={
+        "asset_cfg": SceneEntityCfg("robot", body_names=(".*",)),
+        "operation": "scale",
+        "ranges": (0.9, 1.1),
+      },
+    ),
+    "randomize_actuator_gains": EventTermCfg(
+      mode="reset",
+      func=mdp.randomize_actuator_gains,
+      params={
+        "asset_cfg": SceneEntityCfg("robot"),
+        "kp_range": (0.9, 1.1),
+        "kd_range": (0.9, 1.1),
+        "operation": "scale",
+        "distribution": "log_uniform",
+      },
+    ),
+    "sync_actuator_delays": EventTermCfg(
+      mode="reset",
+      func=dr.sync_actuator_delays,
+      params={
+        "asset_cfg": SceneEntityCfg("robot"),
+        "lag_range": (0, 3),  # Physics steps; no-op if actuators are not DelayedActuator.
+      },
+    ),
     "recovery_assist_force": EventTermCfg(
       func=mdp.apply_recovery_assist_force,
       mode="step",
